@@ -18,7 +18,7 @@ writers. Additionally, great lengths are taken to ensure that the entire
 contents are never required to be entirely resident in memory all at once.
 """
 
-[dependencies]
+[target.'cfg(not(target_env = "sgx"))'.dependencies]
 filetime = "0.2.8"
 
 [dev-dependencies]
@@ -27,6 +27,7 @@ tempfile = "3"
 [target."cfg(unix)".dependencies]
 xattr = { version = "0.2", optional = true }
 libc = "0.2"
+
 
 [features]
 default = ["xattr"]

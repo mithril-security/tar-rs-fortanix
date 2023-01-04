@@ -20,6 +20,7 @@
 #![doc(html_root_url = "https://docs.rs/tar/0.4")]
 #![deny(missing_docs)]
 #![cfg_attr(test, deny(warnings))]
+#![cfg_attr(target_env = "sgx", feature(sgx_platform))]
 
 use std::io::{Error, ErrorKind};
 

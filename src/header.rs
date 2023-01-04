@@ -1,5 +1,7 @@
 #[cfg(unix)]
 use std::os::unix::prelude::*;
+#[cfg(target_env="sgx")]
+use std::os::fortanix_sgx::ffi::{OsStringExt,OsStrExt};
 #[cfg(windows)]
 use std::os::windows::prelude::*;
 
@@ -271,22 +273,6 @@ impl Header {
     /// Returns a view into this header as a byte array.
     pub fn as_mut_bytes(&mut self) -> &mut [u8; 512] {
         &mut self.bytes
-    }
-
-    /// Blanket sets the metadata in this header from the metadata argument
-    /// provided.
-    ///
-    /// This is useful for initializing a `Header` from the OS's metadata from a
-    /// file. By default, this will use `HeaderMode::Complete` to include all
-    /// metadata.
-    pub fn set_metadata(&mut self, meta: &fs::Metadata) {
-        self.fill_from(meta, HeaderMode::Complete);
-    }
-
-    /// Sets only the metadata relevant to the given HeaderMode in this header
-    /// from the metadata argument provided.
-    pub fn set_metadata_in_mode(&mut self, meta: &fs::Metadata, mode: HeaderMode) {
-        self.fill_from(meta, mode);
     }
 
     /// Returns the size of entry's data this header represents.
@@ -712,24 +698,6 @@ impl Header {
             .chain(iter::repeat(&b' ').take(len))
             .chain(&self.bytes[offset + len..])
             .fold(0, |a, b| a + (*b as u32))
-    }
-
-    fn fill_from(&mut self, meta: &fs::Metadata, mode: HeaderMode) {
-        self.fill_platform_from(meta, mode);
-        // Set size of directories to zero
-        self.set_size(if meta.is_dir() || meta.file_type().is_symlink() {
-            0
-        } else {
-            meta.len()
-        });
-        if let Some(ustar) = self.as_ustar_mut() {
-            ustar.set_device_major(0);
-            ustar.set_device_minor(0);
-        }
-        if let Some(gnu) = self.as_gnu_mut() {
-            gnu.set_device_major(0);
-            gnu.set_device_minor(0);
-        }
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -1557,7 +1525,7 @@ fn ends_with_slash(p: &Path) -> bool {
     last == Some(b'/' as u16) || last == Some(b'\\' as u16)
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_env="sgx"))]
 fn ends_with_slash(p: &Path) -> bool {
     p.as_os_str().as_bytes().ends_with(&[b'/'])
 }
@@ -1584,7 +1552,7 @@ pub fn path2bytes(p: &Path) -> io::Result<Cow<[u8]>> {
         })
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_env = "sgx"))]
 /// On unix this will never fail
 pub fn path2bytes(p: &Path) -> io::Result<Cow<[u8]>> {
     Ok(p.as_os_str().as_bytes()).map(Cow::Borrowed)
@@ -1613,7 +1581,7 @@ pub fn bytes2path(bytes: Cow<[u8]>) -> io::Result<Cow<Path>> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, target_env = "sgx"))]
 /// On unix this operation can never fail.
 pub fn bytes2path(bytes: Cow<[u8]>) -> io::Result<Cow<Path>> {
     use std::ffi::{OsStr, OsString};

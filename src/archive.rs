@@ -82,41 +82,6 @@ impl<R: Read> Archive<R> {
         })
     }
 
-    /// Unpacks the contents tarball into the specified `dst`.
-    ///
-    /// This function will iterate over the entire contents of this tarball,
-    /// extracting each file in turn to the location specified by the entry's
-    /// path name.
-    ///
-    /// This operation is relatively sensitive in that it will not write files
-    /// outside of the path specified by `dst`. Files in the archive which have
-    /// a '..' in their path are skipped during the unpacking process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::fs::File;
-    /// use tar::Archive;
-    ///
-    /// let mut ar = Archive::new(File::open("foo.tar").unwrap());
-    /// ar.unpack("foo").unwrap();
-    /// ```
-    pub fn unpack<P: AsRef<Path>>(&mut self, dst: P) -> io::Result<()> {
-        let me: &mut Archive<dyn Read> = self;
-        me._unpack(dst.as_ref())
-    }
-
-    /// Indicate whether extended file attributes (xattrs on Unix) are preserved
-    /// when unpacking this archive.
-    ///
-    /// This flag is disabled by default and is currently only implemented on
-    /// Unix using xattr support. This may eventually be implemented for
-    /// Windows, however, if other archive implementations are found which do
-    /// this as well.
-    pub fn set_unpack_xattrs(&mut self, unpack_xattrs: bool) {
-        self.inner.unpack_xattrs = unpack_xattrs;
-    }
-
     /// Indicate whether extended permissions (like suid on Unix) are preserved
     /// when unpacking this entry.
     ///
@@ -184,38 +149,6 @@ impl Archive<dyn Read + '_> {
             next: 0,
             raw: false,
         })
-    }
-
-    fn _unpack(&mut self, dst: &Path) -> io::Result<()> {
-        if dst.symlink_metadata().is_err() {
-            fs::create_dir_all(&dst)
-                .map_err(|e| TarError::new(format!("failed to create `{}`", dst.display()), e))?;
-        }
-
-        // Canonicalizing the dst directory will prepend the path with '\\?\'
-        // on windows which will allow windows APIs to treat the path as an
-        // extended-length path with a 32,767 character limit. Otherwise all
-        // unpacked paths over 260 characters will fail on creation with a
-        // NotFound exception.
-        let dst = &dst.canonicalize().unwrap_or(dst.to_path_buf());
-
-        // Delay any directory entries until the end (they will be created if needed by
-        // descendants), to ensure that directory permissions do not interfer with descendant
-        // extraction.
-        let mut directories = Vec::new();
-        for entry in self._entries(None)? {
-            let mut file = entry.map_err(|e| TarError::new("failed to iterate over archive", e))?;
-            if file.header().entry_type() == crate::EntryType::Directory {
-                directories.push(file);
-            } else {
-                file.unpack_in(dst)?;
-            }
-        }
-        for mut dir in directories {
-            dir.unpack_in(dst)?;
-        }
-
-        Ok(())
     }
 }
 
