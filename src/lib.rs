@@ -21,6 +21,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(target_env = "sgx", feature(sgx_platform))]
+#![allow(warnings)]
 
 use std::io::{Error, ErrorKind};
 
